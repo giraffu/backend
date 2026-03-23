@@ -132,7 +132,7 @@
   },
   "195": {
     "inputs": {
-      "text": "[512p|5s] \u5973\u4eba\u5feb\u901f\u8131\u6389\u8eab\u4e0a\u6240\u6709\u8863\u670d\uff0c\u6e05\u6670\u7684\u9732\u51fa\u5976\u5b50\u548c\u9634\u90e8\uff0c\u6d51\u8eab\u8d64\u88f8\uff0c\u5973\u5b50\u5feb\u901f\u8eba\u4e0b\uff0c\u53cc\u817f\u5206\u5f00\uff0c\u5973\u4eba\u59cb\u7ec8\u770b\u5411\u955c\u5934\uff1b\u4e00\u540d\u7537\u5b50\u4ece\u4e0b\u65b9\u63a2\u5165\u3002\u4ed6\u63e1\u7740\u52c3\u8d77\u7684\u9634\u830e\uff0c\u7f13\u7f13\u63d2\u5165\u5979\u9634\u9053\u3002",
+      "text": "[512p|5s] \u56fe\u4e2d\u7684\u5973\u751f\u62ff\u7740\u5200\u628a\u81ea\u5df1\u7684\u5934\u780d\u4e0b\u6765\uff0c\u8981\u771f\u5b9e\u6027\uff0c\u7b26\u5408\u73b0\u5b9e",
       "clip": [
         "272",
         1
@@ -293,7 +293,7 @@
   },
   "294": {
     "inputs": {
-      "image": "09c0305c-adcd-497b-b3b8-4860345b7a8e_c0d8e339-caab-465a-99bf-2051085c3f1d.png"
+      "image": "02ecc7e7-13cc-47aa-838e-0b207a626381_7a2fc674-4dce-4709-9439-6e1384207819.png"
     },
     "class_type": "LoadImage"
   }
