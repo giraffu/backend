@@ -1,13 +1,16 @@
 {
   "1": {
     "inputs": {
-      "text": "\u8fc7\u66dd\uff0c\u9759\u6001\uff0c\u7ec6\u8282\u6a21\u7cca\u4e0d\u6e05\uff0c\u5b57\u5e55\uff0c\u98ce\u683c\uff0c\u4f5c\u54c1\uff0c\u753b\u4f5c\uff0c\u753b\u9762\uff0c\u9759\u6b62\uff0c\u6574\u4f53\u53d1\u7070\uff0c\u6700\u5dee\u8d28\u91cf\uff0c\u4f4e\u8d28\u91cf\uff0cJPEG\u538b\u7f29\u6b8b\u7559\uff0c\u4e11\u964b\u7684\uff0c\u6b8b\u7f3a\u7684\uff0c\u591a\u4f59\u7684\u624b\u6307\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u624b\u90e8\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u8138\u90e8\uff0c\u7578\u5f62\u7684\uff0c\u6bc1\u5bb9\u7684\uff0c\u5f62\u6001\u7578\u5f62\u7684\u80a2\u4f53\uff0c\u624b\u6307\u878d\u5408\uff0c\u9759\u6b62\u4e0d\u52a8\u7684\u753b\u9762\uff0c\u6742\u4e71\u7684\u80cc\u666f\uff0c\u4e09\u6761\u817f\uff0c\u80cc\u666f\u4eba\u5f88\u591a\uff0c\u5012\u7740\u8d70",
+      "text": "过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
       "clip": [
         "272",
         1
       ]
     },
-    "class_type": "CLIPTextEncode"
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
   },
   "29": {
     "inputs": {
@@ -20,7 +23,10 @@
         0
       ]
     },
-    "class_type": "VAEDecode"
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
   },
   "30": {
     "inputs": {
@@ -30,7 +36,10 @@
         0
       ]
     },
-    "class_type": "ModelSamplingSD3"
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "采样算法（SD3）"
+    }
   },
   "31": {
     "inputs": {
@@ -40,14 +49,20 @@
         0
       ]
     },
-    "class_type": "ModelSamplingSD3"
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "采样算法（SD3）"
+    }
   },
   "32": {
     "inputs": {
       "unet_name": "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8L.safetensors",
       "weight_dtype": "default"
     },
-    "class_type": "UNETLoader"
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
   },
   "33": {
     "inputs": {
@@ -55,20 +70,29 @@
       "type": "wan",
       "device": "default"
     },
-    "class_type": "CLIPLoader"
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载CLIP"
+    }
   },
   "34": {
     "inputs": {
       "unet_name": "wan22EnhancedNSFWSVICamera_nsfwFASTMOVEV2FP8H.safetensors",
       "weight_dtype": "default"
     },
-    "class_type": "UNETLoader"
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
   },
   "35": {
     "inputs": {
       "vae_name": "wan_2.1_vae.safetensors"
     },
-    "class_type": "VAELoader"
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
   },
   "117": {
     "inputs": {
@@ -98,7 +122,10 @@
         2
       ]
     },
-    "class_type": "KSamplerAdvanced"
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "K采样器（高级）"
+    }
   },
   "118": {
     "inputs": {
@@ -128,17 +155,23 @@
         0
       ]
     },
-    "class_type": "KSamplerAdvanced"
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "K采样器（高级）"
+    }
   },
   "195": {
     "inputs": {
-      "text": "[512p|5s] \u5fc5\u987b\u753b\u9762\u4fdd\u6301\u539f\u56fe\u5973\u5b69\u8138\u90e8\u4e00\u81f4\u6027\uff0c\u4f7f\u7528\u4f73\u80fd\u76f8\u673a\u62cd\u6444\uff0c\u753b\u8d28\u67d4\u548c\uff0c\u5149\u7ebf\u67d4\u548c\uff0c\u771f\u5b9e\u611f\u3002\n\u5973\u751f\u77ac\u95f4\u8131\u5149\u8eab\u4e0a\u6240\u6709\u8863\u7269\uff0c\u9732\u51fa\u5b8c\u7f8e\u7684D\u7f69\u676f\u4e73\u623f\uff0c\u4e73\u5934\u7c89\u7c89\u5ae9\u5ae9\u3002\u5973\u4eba\u8e72\u5750\u5728\u4e00\u4e2a\u8eba\u5728\u5730\u4e0a\u7684\u88f8\u4f53\u7537\u4eba\u7684\u8eab\u4e0a\uff0c\u5973\u4eba\u7684\u817f\u5448m\u5b57\u5f62\uff0c\u9634\u830e\u63d2\u5165\u4e86\u5973\u4eba\u7684\u9634\u9053\uff0c\u5973\u4eba\u4e0a\u4e0b\u8815\u52a8\u8ba9\u9634\u830e\u4e0d\u65ad\u7684\u4e0e\u9634\u9053\u8fdb\u884c\u6d3b\u585e\u8fd0\u52a8\u3002\u4fdd\u6301\u5973\u5b69\u4fdd\u6301\u9762\u90e8\u7ec6\u8282\uff0c\u4fdd\u6301\u771f\u5b9e\u611f\u4e0e\u539f\u56fe\u4e00\u81f4\u3002\u5973\u5b69\u80a4\u8272\u548c\u80a4\u8d28\u548c\u539f\u56fe\u4e00\u81f4\u3002\u5973\u5b69\u8981\u4e00\u76f4\u6ce8\u89c6\u955c\u5934\u3002\u4e25\u683c\u4fdd\u6301\u5973\u751f\u7684\u8138\u90e8\u4e0e\u539f\u56fe\u7247\u4e00\u81f4\u3002",
+      "text": "女人快速脱掉身上所有衣服，清晰的露出奶子和阴部，浑身赤裸，女子躺在床榻上，双腿分开，女人始终看向镜头；一名男子从下方探入。他握着勃起的阴茎，缓缓插入她阴道。",
       "clip": [
         "272",
         1
       ]
     },
-    "class_type": "CLIPTextEncode"
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
   },
   "201": {
     "inputs": {
@@ -148,7 +181,10 @@
         0
       ]
     },
-    "class_type": "ModelPatchTorchSettings"
+    "class_type": "ModelPatchTorchSettings",
+    "_meta": {
+      "title": "Model Patch Torch Settings"
+    }
   },
   "202": {
     "inputs": {
@@ -159,7 +195,10 @@
         0
       ]
     },
-    "class_type": "PathchSageAttentionKJ"
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
   },
   "203": {
     "inputs": {
@@ -169,7 +208,10 @@
         0
       ]
     },
-    "class_type": "ModelPatchTorchSettings"
+    "class_type": "ModelPatchTorchSettings",
+    "_meta": {
+      "title": "Model Patch Torch Settings"
+    }
   },
   "204": {
     "inputs": {
@@ -180,7 +222,10 @@
         0
       ]
     },
-    "class_type": "PathchSageAttentionKJ"
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
   },
   "263": {
     "inputs": {
@@ -196,7 +241,10 @@
         0
       ]
     },
-    "class_type": "FindPerfectResolution"
+    "class_type": "FindPerfectResolution",
+    "_meta": {
+      "title": "Find Perfect Resolution"
+    }
   },
   "265": {
     "inputs": {
@@ -208,14 +256,22 @@
         0
       ]
     },
-    "class_type": "FL_RIFE"
+    "class_type": "FL_RIFE",
+    "_meta": {
+      "title": "FL RIFE Frame Interpolation"
+    }
   },
   "272": {
     "inputs": {
       "PowerLoraLoaderHeaderWidget": {
         "type": "PowerLoraLoaderHeaderWidget"
       },
-      "\u2795 Add Lora": "",
+      "lora_1": {
+        "on": true,
+        "lora": "PenInsert_high_noise.safetensors",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
       "model": [
         "30",
         0
@@ -225,20 +281,31 @@
         0
       ]
     },
-    "class_type": "Power Lora Loader (rgthree)"
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
   },
   "273": {
     "inputs": {
       "PowerLoraLoaderHeaderWidget": {
         "type": "PowerLoraLoaderHeaderWidget"
       },
-      "\u2795 Add Lora": "",
+      "lora_1": {
+        "on": true,
+        "lora": "PenInsert_low_noise.safetensors",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
       "model": [
         "31",
         0
       ]
     },
-    "class_type": "Power Lora Loader (rgthree)"
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
   },
   "285": {
     "inputs": {
@@ -270,7 +337,10 @@
         0
       ]
     },
-    "class_type": "PainterI2V"
+    "class_type": "PainterI2V",
+    "_meta": {
+      "title": "PainterI2V"
+    }
   },
   "290": {
     "inputs": {
@@ -289,12 +359,18 @@
         0
       ]
     },
-    "class_type": "VHS_VideoCombine"
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
   },
   "294": {
     "inputs": {
-      "image": "8ba12d04-d605-447b-ba08-38fd5a55ff54_baf48113-2b9c-4fc3-a1f4-3d825c6b9bd7.png"
+      "image": "IMG_2833.png"
     },
-    "class_type": "LoadImage"
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载图像"
+    }
   }
 }

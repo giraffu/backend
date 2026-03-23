@@ -2,16 +2,10 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     redis_url: str = "redis://backend-redis-1:6379/0"
-    comfy_api_base: str = "http://192.168.1.226:8188"
-    comfy_ws_url: str = "ws://192.168.1.226:8188/ws"
     auth_token: str = "your_secure_token_here"
     
-    # ComfyUI paths (for saving uploaded files and reading outputs)
-    comfy_input_dir: str = "/home/ubantu/comfyui/input"
-    comfy_output_dir: str = "/home/ubantu/comfyui/output"
-    comfy_temp_dir: str = "/home/ubantu/comfyui/temp"
-    
-    # Workflow templates directory
+    # Workflow templates directory (still used for mapping or default configs if needed by some tasks, 
+    # though agent uses its own)
     workflows_dir: str = "/app/workflows"
     
     # MinIO Configuration
@@ -22,6 +16,10 @@ class Settings(BaseSettings):
     minio_result_bucket: str = "comfyui-temp"
     minio_template_bucket: str = "bot-template"
     minio_secure: bool = False
+    
+    # Agent Configuration
+    agent_secret_token: str = "super_secret_agent_token_2026"
+    minio_input_bucket: str = "comfyui-input"
     
     class Config:
         env_file = ".env"

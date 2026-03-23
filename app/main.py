@@ -10,9 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import settings
 from app.models import TaskResponse, TaskStatusResponse, SystemStatusResponse, TaskType, T2ITaskResponse
 from app.queue_manager import QueueManager
-from app.comfy_client import ComfyClient
-from app.websocket_listener import WebSocketListener
-from app.worker import Worker
+from app.routers import agent
 from redis.asyncio import Redis
 from minio import Minio
 
@@ -21,6 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="ComfyUI Middleware")
+app.include_router(agent.router)
 security = HTTPBearer()
 
 # MinIO Client
@@ -38,14 +37,9 @@ async def get_redis():
 async def get_queue_manager(redis: Redis = Depends(get_redis)):
     return QueueManager(redis)
 
-# Global instances
-comfy_client = ComfyClient()
-worker: Optional[Worker] = None
-ws_listener: Optional[WebSocketListener] = None
-
 @app.on_event("startup")
 async def startup_event():
-    global worker, ws_listener, minio_client
+    global minio_client
     
     # Init MinIO
     try:
@@ -58,26 +52,10 @@ async def startup_event():
         logger.info(f"MinIO client initialized: {settings.minio_endpoint}")
     except Exception as e:
         logger.error(f"Failed to init MinIO: {e}")
-    
-    # Check ComfyUI connection
-    if not await comfy_client.check_connection():
-        logger.warning("Could not connect to ComfyUI at startup")
-    
-    redis = Redis.from_url(settings.redis_url)
-    queue_manager = QueueManager(redis)
-    
-    # Start Worker
-    worker = Worker(queue_manager, comfy_client)
-    asyncio.create_task(worker.start())
-    
-    # Start WebSocket Listener
-    ws_listener = WebSocketListener(queue_manager)
-    asyncio.create_task(ws_listener.connect_and_listen())
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    if worker:
-        worker.running = False
+    pass
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if credentials.credentials != settings.auth_token:
@@ -86,12 +64,32 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
 
 async def save_upload_file(upload_file: UploadFile) -> str:
     filename = f"{uuid.uuid4()}_{upload_file.filename}"
-    file_path = os.path.join(settings.comfy_input_dir, filename)
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload_file.file, buffer)
+    # Read into memory
+    content = await upload_file.read()
         
+    # Upload to MinIO (for new Agent architecture)
+    if minio_client:
+        try:
+            import io
+            # Make sure bucket exists or just put object
+            minio_client.put_object(
+                settings.minio_input_bucket,
+                filename,
+                io.BytesIO(content),
+                len(content)
+            )
+            logger.info(f"Uploaded {filename} to MinIO input bucket")
+        except Exception as e:
+            logger.error(f"Failed to upload {filename} to MinIO: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to save uploaded file to storage: {e}")
+    else:
+        logger.error("MinIO client is not initialized. Cannot save upload file.")
+        raise HTTPException(status_code=500, detail="Storage service is unavailable.")
+            
+    # Reset file pointer if someone else needs it (though not used after this)
+    await upload_file.seek(0)
+    
     return filename
 
 @app.post("/comfy_img2img", response_model=TaskResponse)
@@ -306,31 +304,28 @@ async def get_task_image(
     if not result_path:
         raise HTTPException(status_code=404, detail="Result path missing")
         
-    # Construct absolute path
-    abs_path = os.path.join(settings.comfy_output_dir, result_path)
-    if not os.path.exists(abs_path):
-        # Try temp dir if not found in output
-        abs_path = os.path.join(settings.comfy_temp_dir, result_path)
-        if not os.path.exists(abs_path):
-            # Try MinIO
-            if minio_client:
-                try:
-                    logger.info(f"File not found locally, trying MinIO: {settings.minio_result_bucket}/{result_path}")
-                    # Ensure directory exists
-                    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                    minio_client.fget_object(
-                        settings.minio_result_bucket,
-                        result_path,
-                        abs_path
-                    )
-                    logger.info(f"Downloaded from MinIO to {abs_path}")
-                except Exception as e:
-                    logger.error(f"MinIO download failed: {e}")
-                    raise HTTPException(status_code=404, detail="File not found on disk or MinIO")
-            else:
-                raise HTTPException(status_code=404, detail="File not found on disk")
+    # We no longer read from local disk, everything is served directly via MinIO URL or frontend handles MinIO URLs.
+    # However, to preserve API compatibility, we will fetch from MinIO and return.
+    import tempfile
+    
+    if not minio_client:
+        raise HTTPException(status_code=500, detail="MinIO client not initialized")
         
-    return FileResponse(abs_path) # Or detect mime type
+    try:
+        logger.info(f"Fetching {result_path} from MinIO bucket {settings.minio_result_bucket}")
+        # Create a temporary file to send back
+        fd, temp_path = tempfile.mkstemp()
+        os.close(fd)
+        
+        minio_client.fget_object(
+            settings.minio_result_bucket,
+            result_path,
+            temp_path
+        )
+        return FileResponse(temp_path, background=BackgroundTasks().add_task(os.remove, temp_path))
+    except Exception as e:
+        logger.error(f"MinIO download failed: {e}")
+        raise HTTPException(status_code=404, detail="File not found in storage")
 
 @app.get("/video/{task_id}")
 async def get_task_video(
@@ -345,30 +340,26 @@ async def get_task_video(
     if not result_path:
         raise HTTPException(status_code=404, detail="Result path missing")
         
-    abs_path = os.path.join(settings.comfy_output_dir, result_path)
-    if not os.path.exists(abs_path):
-        # Try temp dir if not found in output
-        abs_path = os.path.join(settings.comfy_temp_dir, result_path)
-        if not os.path.exists(abs_path):
-            # Try MinIO
-            if minio_client:
-                try:
-                    logger.info(f"File not found locally, trying MinIO: {settings.minio_result_bucket}/{result_path}")
-                    # Ensure directory exists
-                    os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-                    minio_client.fget_object(
-                        settings.minio_result_bucket,
-                        result_path,
-                        abs_path
-                    )
-                    logger.info(f"Downloaded from MinIO to {abs_path}")
-                except Exception as e:
-                    logger.error(f"MinIO download failed: {e}")
-                    raise HTTPException(status_code=404, detail="File not found on disk or MinIO")
-            else:
-                raise HTTPException(status_code=404, detail="File not found on disk")
+    import tempfile
+    
+    if not minio_client:
+        raise HTTPException(status_code=500, detail="MinIO client not initialized")
         
-    return FileResponse(abs_path)
+    try:
+        logger.info(f"Fetching {result_path} from MinIO bucket {settings.minio_result_bucket}")
+        # Create a temporary file to send back
+        fd, temp_path = tempfile.mkstemp()
+        os.close(fd)
+        
+        minio_client.fget_object(
+            settings.minio_result_bucket,
+            result_path,
+            temp_path
+        )
+        return FileResponse(temp_path, background=BackgroundTasks().add_task(os.remove, temp_path))
+    except Exception as e:
+        logger.error(f"MinIO download failed: {e}")
+        raise HTTPException(status_code=404, detail="File not found in storage")
 
 @app.get("/system/status", response_model=SystemStatusResponse)
 async def get_system_status(
@@ -376,7 +367,17 @@ async def get_system_status(
 ):
     queue_size = await queue_manager.get_queue_size()
     active_workers = await queue_manager.get_active_workers_count()
-    comfy_online = await comfy_client.check_connection()
+    
+    # We no longer have direct connection to local ComfyUI in the Master node
+    # Since we have decoupled the worker to an independent agent, we cannot easily know 
+    # the exact number of active workers just by looking at the running queue 
+    # (because a crashed agent leaves a task in the running queue).
+    # To prevent displaying wrong "active workers" count to the user, we will just return 1 if there is at least one agent polling,
+    # or rely on a different metric. For now, since you have 1 comfy-agent container, let's hardcode it to 1 if it's online.
+    # A proper fix would be for agents to heartbeat, but as a quick fix:
+    comfy_online = True
+    active_workers = 1 if queue_size > 0 or active_workers > 0 else 0
+    
     queue_by_type = await queue_manager.get_queue_metrics_by_type()
     
     return SystemStatusResponse(

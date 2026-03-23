@@ -1,14 +1,12 @@
 import httpx
-import json
 import logging
-from typing import Dict, Any, Optional
-from app.config import settings
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
 class ComfyClient:
-    def __init__(self):
-        self.base_url = settings.comfy_api_base
+    def __init__(self, base_url: str):
+        self.base_url = base_url
         self.client = httpx.AsyncClient(base_url=self.base_url, timeout=30.0)
 
     async def check_connection(self) -> bool:
@@ -23,10 +21,16 @@ class ComfyClient:
         """
         Upload an image to ComfyUI input directory.
         """
-        files = {"image": (filename, file_content)}
-        data = {"subfolder": subfolder, "type": "input", "overwrite": "true"}
+        # The multipart format expected by ComfyUI
+        files = {"image": (filename, file_content, "image/png")}
+        data = {"overwrite": "true"}
+        if subfolder:
+            data["subfolder"] = subfolder
         
+        # Use multipart explicitly
         response = await self.client.post("/upload/image", files=files, data=data)
+        if response.status_code != 200:
+            logger.error(f"ComfyUI upload error: {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -59,3 +63,6 @@ class ComfyClient:
         response = await self.client.get("/view", params=params)
         response.raise_for_status()
         return response.content
+
+    async def close(self):
+        await self.client.aclose()
