@@ -1,0 +1,10 @@
+nohup: 忽略输入
+INFO:     Started server process [988762]
+INFO:     Waiting for application startup.
+INFO:httpx:HTTP Request: GET http://127.0.0.1:8188/system_stats "HTTP/1.1 200 OK"
+INFO:app.worker:Worker started
+INFO:     Application startup complete.
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8003): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:app.websocket_listener:Connected to ComfyUI WebSocket at ws://127.0.0.1:8188/ws?clientId=middleware_listener_v2

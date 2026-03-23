@@ -1,0 +1,103 @@
+{
+  "1": {
+    "inputs": {
+      "ckpt_name": "Qwen-Rapid-AIO-NSFW-v23.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple"
+  },
+  "2": {
+    "inputs": {
+      "seed": 65454653,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "sa_solver",
+      "scheduler": "beta",
+      "denoise": 0.9,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "3",
+        0
+      ],
+      "negative": [
+        "4",
+        0
+      ],
+      "latent_image": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "KSampler"
+  },
+  "3": {
+    "inputs": {
+      "prompt": "\u8bbe\u7f6e",
+      "clip": [
+        "1",
+        1
+      ],
+      "vae": [
+        "1",
+        2
+      ],
+      "image1": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus"
+  },
+  "4": {
+    "inputs": {
+      "prompt": "",
+      "clip": [
+        "1",
+        1
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus"
+  },
+  "5": {
+    "inputs": {
+      "samples": [
+        "2",
+        0
+      ],
+      "vae": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "VAEDecode"
+  },
+  "6": {
+    "inputs": {
+      "images": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "PreviewImage"
+  },
+  "8": {
+    "inputs": {
+      "image": "13c3b3a0-1d90-4b62-8569-9a40dbdb648f_dd0cfb68-8b69-4978-8be7-b7cfd0bc2d2b.png"
+    },
+    "class_type": "LoadImage"
+  },
+  "9": {
+    "inputs": {
+      "width": 480,
+      "height": 768,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage"
+  }
+}

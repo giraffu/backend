@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: always
+
+  api:
+    build: .
+    ports:
+      - "8003:8003"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - COMFY_API_BASE=http://host.docker.internal:8188
+      - COMFY_WS_URL=ws://host.docker.internal:8188/ws
+      - AUTH_TOKEN=your_secure_token_here
+      - COMFY_INPUT_DIR=/home/ubantu/comfyui/input
+      - COMFY_OUTPUT_DIR=/home/ubantu/comfyui/output
+      - COMFY_TEMP_DIR=/home/ubantu/comfyui/temp
+      - WORKFLOWS_DIR=/app/workflows
+      - MINIO_ENDPOINT=192.168.1.115:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=bot-data
+      - MINIO_RESULT_BUCKET=comfyui-temp
+      - MINIO_TEMPLATE_BUCKET=bot-template
+      - MINIO_SECURE=false
+    volumes:
+      - /home/ubantu/comfyui:/home/ubantu/comfyui
+      - ./workflows:/app/workflows
+      - ./app:/app/app
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+volumes:
+  redis_data:
