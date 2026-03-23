@@ -1,13 +1,13 @@
 {
   "2": {
     "inputs": {
-      "image": "28287686-7315-491c-b490-c5c363f80169_eac105f1-51fb-415a-bb0b-64b6511e6741.png"
+      "image": "42caef9a-5179-4d3c-9901-dcd13e38abcb_f16343e1-7335-4f9c-adce-27d444f7948c.png"
     },
     "class_type": "LoadImage"
   },
   "3": {
     "inputs": {
-      "image": "93b10b7c-b656-4cc6-a55a-baafbc594948_44b30248-5b7e-457d-8213-aafd22d40f93.png"
+      "image": "687f99d1-ca61-4e49-9ee7-1b2f68779ecd_f9596d3d-8110-47ce-b562-cb62ecfc2004.png"
     },
     "class_type": "LoadImage"
   },
