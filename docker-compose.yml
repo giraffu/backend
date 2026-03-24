@@ -18,8 +18,8 @@ services:
       - AUTH_TOKEN=your_secure_token_here
       - WORKFLOWS_DIR=/app/workflows
       - MINIO_ENDPOINT=192.168.1.115:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=chuzeyu
+      - MINIO_SECRET_KEY=@Cv1347968277
       - MINIO_BUCKET=bot-data
       - MINIO_INPUT_BUCKET=comfyui-input
       - MINIO_RESULT_BUCKET=comfyui-temp

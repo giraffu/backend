@@ -24,6 +24,7 @@ logger = logging.getLogger("agent_main")
 
 # Configuration
 AGENT_ID = os.getenv("AGENT_ID", "worker_local_01")
+SUPPORTED_TASK_TYPES = os.getenv("SUPPORTED_TASK_TYPES", "") # e.g. "img2img,face_swap"
 MASTER_API_URL = os.getenv("MASTER_API_URL", "http://127.0.0.1:8000")
 AGENT_SECRET_TOKEN = os.getenv("AGENT_SECRET_TOKEN", "")
 
@@ -310,11 +311,15 @@ class ComfyAgent:
             self.current_prompt_id = None
 
     async def poll_loop(self):
-        logger.info(f"Agent {AGENT_ID} started polling {MASTER_API_URL} for tasks...")
+        logger.info(f"Agent {AGENT_ID} started polling {MASTER_API_URL} for tasks (types: {SUPPORTED_TASK_TYPES or 'all'})...")
         while True:
             try:
-                # Poll for tasks
-                response = await self.master_client.get("/api/agent/task/pop")
+                # Poll for tasks with optional type filtering
+                params = {}
+                if SUPPORTED_TASK_TYPES:
+                    params["types"] = SUPPORTED_TASK_TYPES
+                
+                response = await self.master_client.get("/api/agent/task/pop", params=params)
                 if response.status_code == 200:
                     data = response.json()
                     task = data.get("task")

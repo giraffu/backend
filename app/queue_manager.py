@@ -52,23 +52,51 @@ class QueueManager:
         # Convert bytes to string
         return {k.decode(): v.decode() for k, v in data.items()}
 
-    async def dequeue_task(self) -> Optional[Tuple[str, float]]:
-        # Atomically pop the member with the lowest score
-        result = await self.redis.zpopmin(self.pending_key)
-        if not result:
-            return None
+    async def dequeue_task(self, allowed_types: Optional[list[str]] = None) -> Optional[Tuple[str, float]]:
+        # If no types specified, pop the top task as before
+        if not allowed_types:
+            result = await self.redis.zpopmin(self.pending_key)
+            if not result:
+                return None
+            task_id, score = result[0]
+            task_id = task_id.decode() if isinstance(task_id, bytes) else task_id
+            await self._mark_task_running(task_id)
+            return task_id, score
+
+        # If specific types are allowed, find the highest priority task matching those types
+        # We fetch a batch of tasks to minimize Redis roundtrips
+        batch_size = 50
+        offset = 0
+        while True:
+            tasks_with_scores = await self.redis.zrange(self.pending_key, offset, offset + batch_size - 1, withscores=True)
+            if not tasks_with_scores:
+                return None
             
-        task_id, score = result[0]
-        task_id = task_id.decode() if isinstance(task_id, bytes) else task_id
-        
+            for task_id_bytes, score in tasks_with_scores:
+                task_id = task_id_bytes.decode() if isinstance(task_id_bytes, bytes) else task_id_bytes
+                task_key = f"{self.task_prefix}{task_id}"
+                
+                # Check task type
+                task_type_bytes = await self.redis.hget(task_key, "type")
+                if not task_type_bytes:
+                    continue
+                
+                task_type = task_type_bytes.decode() if isinstance(task_type_bytes, bytes) else task_type_bytes
+                if task_type in allowed_types:
+                    # Atomically remove from pending and check if we succeeded (to avoid race conditions)
+                    removed = await self.redis.zrem(self.pending_key, task_id)
+                    if removed:
+                        await self._mark_task_running(task_id)
+                        return task_id, score
+            
+            offset += batch_size
+
+    async def _mark_task_running(self, task_id: str):
         # Move to running set
         await self.redis.sadd(self.running_key, task_id)
-        
         # Update status
         task_key = f"{self.task_prefix}{task_id}"
         await self.redis.hset(task_key, "status", TaskStatus.RUNNING)
-        
-        return task_id, score
 
     async def set_prompt_id(self, task_id: str, prompt_id: str):
         task_key = f"{self.task_prefix}{task_id}"

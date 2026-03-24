@@ -73,8 +73,10 @@
 - **描述**: 文生图工作流，集成 Double checkpoints 与现实增强器。
 - **请求参数 (application/json)**:
   - `prompt` (String, 必填): 生成提示词，长度 1-512。
+  - `priority` (Integer, 选填): 任务优先级，默认 0。
 - **查询参数**:
   - `async` (Boolean, 默认 true): 是否异步执行。若为 `false`，则同步阻塞等待结果（超时 60s）。
+  - `priority` (Integer, 选填): 优先级。若 JSON 中也存在，则以 JSON 为准。
 - **响应示例**:
   ```json
   {
@@ -145,14 +147,15 @@
 
 - **路径**: `/image/{task_id}` 或 `/video/{task_id}`
 - **方法**: `GET`
-- **描述**: 下载任务生成的图片或视频文件。系统会依次在本地的 `output` 目录和 `temp` 目录中寻找文件，如果本地均未找到，会自动向云端 MinIO 对象存储发起请求并下载回退（Fallback）文件。
+- **描述**: 下载任务生成的图片或视频文件。系统采用**云端优先/回退机制**：主控节点会直接从 MinIO 对象存储的 `comfyui-temp` 桶中下载文件并返回给用户。不再依赖本地磁盘共享。
 - **错误处理**:
-  - `404 Not Found`: 文件在本地和 MinIO 中均不存在或任务未完成。
+  - `404 Not Found`: 文件在 MinIO 中不存在或任务未完成。
 
 #### 1.2.9 系统状态
 
 - **路径**: `/system/status`
 - **方法**: `GET`
+- **描述**: 获取系统整体运行状态，包括队列积压情况和活跃 Agent 数量。
 - **响应示例**:
   ```json
   {
@@ -166,6 +169,11 @@
   }
   ```
 
+#### 1.2.10 Agent 内部接口 (仅供 Agent 调用)
+
+- **路径**: `/api/agent/task/pop` | `POST /api/agent/task/status` | `POST /api/agent/task/complete`
+- **描述**: 支撑分布式架构的核心接口。其中 `/pop` 接口支持 `types` 查询参数（逗号分隔），允许 Agent 根据自身硬件配置或预装模型，定向接取特定类型的任务。
+
 ***
 
 ## 2. 系统架构设计文档
@@ -174,46 +182,47 @@
 
 - **编程语言**: Python 3.10
 - **Web 框架**: FastAPI (高性能异步框架)
+- **分布式 Agent**: `comfy_agent` (独立项目，负责任务执行与 ComfyUI 交互)
 - **应用服务器**: Uvicorn (ASGI)
-- **消息队列/缓存**: Redis 7.0 (用于任务队列、状态存储)
-- **对象存储**: MinIO (用于图片/视频生成结果的回退下载与存储)
+- **消息队列/缓存**: Redis 7.0 (用于任务调度、状态同步、Worker 注册)
+- **对象存储**: MinIO (核心存储组件，实现主控与 Agent 之间的文件流转)
 - **AI 引擎**: ComfyUI (基于 Stable Diffusion 的节点式工作流引擎)
 - **容器化**: Docker & Docker Compose
 
-### 2.2 架构设计 (C4 Container 模型)
+### 2.2 架构设计 (分布式 Agent 模型)
 
 ```mermaid
 graph TD
     User[用户/前端] -->|HTTP请求| API[API Gateway (FastAPI)]
-    API -->|写入任务| Redis[(Redis Queue)]
-    API -->|保存文件| FS[文件存储 (Input)]
+    API -->|1. 任务写入| Redis[(Redis Queue)]
+    API -->|2. 图片直传| MinIO[(MinIO Object Storage)]
     
-    subgraph Backend Service
-        Worker[异步 Worker]
-        WS[WebSocket Listener]
+    subgraph Execution Node (Agent Server)
+        Agent[comfy_agent]
+        ComfyUI[ComfyUI Server]
     end
     
-    Worker -->|轮询任务| Redis
-    Worker -->|读取模板| WorkflowFS[Workflow Templates]
-    Worker -->|提交任务 (HTTP)| ComfyUI[ComfyUI Server]
-    
-    ComfyUI -->|执行状态 (WS)| WS
-    WS -->|更新状态| Redis
-    ComfyUI -->|写入结果| FS_OUT[文件存储 (Output/Temp)]
+    Agent -->|3. 轮询 Pop Task| API
+    Agent -->|4. 下载 Input| MinIO
+    Agent -->|5. 提交执行 (HTTP)| ComfyUI
+    ComfyUI -->|6. 渲染结果| Agent
+    Agent -->|7. 上传结果| MinIO
+    Agent -->|8. 回传 Status/Complete| API
     
     User -->|轮询状态/下载| API
-    API -->|读取结果| FS_OUT
-    API -.->|未命中时回退读取| MinIO[(MinIO Object Storage)]
+    API -->|9. 从云端获取结果| MinIO
 ```
 
 ### 2.3 核心机制
 
-1. **异步任务队列**: 采用 Redis `Sorted Set` 实现优先级队列 (`comfy:queue:pending`)，确保高优先级任务优先处理。
-2. **状态同步**: 通过 WebSocket 长连接实时监听 ComfyUI 的执行事件 (`execution_start`, `progress`, `executed`)，将状态实时映射回 Redis (`comfy:task:{id}`)。
-3. **工作流补丁 (Patching)**: 系统维护 JSON 格式的 ComfyUI 工作流模板，Worker 根据用户输入动态替换节点参数 (Seed, Prompt, Image Path) 后提交执行。
-4. **文件流转**:
-   - 上传文件 -> `comfyui/input/`
-   - 生成结果 -> `comfyui/output/` 或 `comfyui/temp/` (API 自动搜寻)
+1. **分布式 Agent 架构**: 实现主控 (`backend-api`) 与执行端 (`comfy_agent`) 的彻底解耦。主控仅负责 API 路由、任务调度和结果分发；Agent 运行在 GPU 机器上，负责具体的渲染工作。
+2. **异步任务调度**: 采用 Redis `Sorted Set` 实现优先级队列 (`comfy:queue:pending`)。Agent 通过 `GET /api/agent/task/pop` 接口主动拉取任务。该接口支持按任务类型过滤（通过 `types` 参数），实现了任务的定向路由。
+3. **状态同步机制**: Agent 内部集成 WebSocket 监听 ComfyUI 执行进度，并通过 `POST /api/agent/task/status` 定时回传给主控，主控将状态映射回 Redis (`comfy:task:{id}`) 供用户查询。
+4. **云端文件流转 (MinIO)**: 
+   - **上传**: 主控接收用户文件后，直接通过 `boto3` 流式上传至 MinIO，不经过本地磁盘。
+   - **下载**: Agent 领到任务后，按需从 MinIO 下载输入图片。
+   - **结果**: Agent 渲染完成后，通过 ComfyUI `/view` API 获取字节流并上传至 MinIO `comfyui-temp` 桶，随后通知主控完成任务。
+5. **工作流补丁 (Patching)**: Agent 维护 JSON 格式的工作流模板，根据任务参数动态注入 Seed、Prompt 等字段，并处理图片上传至 ComfyUI 的 Multipart 逻辑。
 
 ### 2.4 安全防护
 
@@ -229,10 +238,10 @@ graph TD
 
 | 错误现象             | 可能原因                                     | 排查/解决策略                                                                     |
 | ---------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| **任务一直 Pending** | 1. Worker 未启动2. Redis 连接失败3. 队列阻塞        | 1. 检查日志 `docker logs backend-api-1`2. 检查 Redis 服务状态3. 重启后端服务清除僵尸任务          |
-| **任务 Error**     | 1. ComfyUI 离线2. 工作流 JSON 错误3. 显存不足 (OOM) | 1. 检查 ComfyUI 容器状态2. 检查 `workflows/debug_*.json` 生成的补丁文件3. 查看 ComfyUI 控制台日志 |
-| **结果下载 404**     | 1. 文件生成在 Temp 目录2. 文件名解析错误3. 权限问题        | 1. 系统已自动回退查找 Temp 目录2. 检查 WebSocket `executed` 消息日志3. 确认 Docker 卷挂载权限       |
-| **WebSocket 断连** | ComfyUI 重启或网络波动                          | 系统内置自动重连机制 (每 5秒 重试)，无需人工干预                                                 |
+| **任务一直 Pending** | 1. Agent 未启动 2. Redis 任务堆积 3. 网络隔离 | 1. 检查 Agent 日志 `docker logs comfy-agent` 2. 检查 Redis 状态 3. 确保 Agent 能访问主控 IP |
+| **任务 Error**     | 1. ComfyUI 离线 2. MinIO 上传/下载失败 3. 显存不足 | 1. 检查 ComfyUI 容器 2. 验证 MinIO 凭据 3. 查看 ComfyUI 控制台 |
+| **结果下载 404**     | 1. Agent 未成功上传结果 2. 任务状态不同步 | 1. 检查 Agent 端的 `POST /task/complete` 调用是否成功 2. 确认 MinIO 桶权限 |
+| **循环依赖报错** | 主控路由与 main.py 交叉引用 | 检查 `app/routers/agent.py` 是否正确使用依赖注入，避免直接 import main 实例 |
 
 ### 3.2 监控告警规则 (建议)
 
@@ -269,43 +278,33 @@ graph TD
 ### 5.1 服务启停
 
 ```bash
-# 启动服务 (后台运行)
+# 1. 启动主控服务 (backend-api)
 cd /home/ubantu/backend
 docker compose up -d
 
-# 停止服务
-docker compose down
+# 2. 启动执行节点 (comfy_agent)
+cd /home/ubantu/backend/comfy_agent
+docker compose up -d
 
-# 重启 API 服务 (应用代码变更后)
-docker compose restart api
+# 停止所有服务
+docker compose -f /home/ubantu/backend/docker-compose.yml -f /home/ubantu/backend/comfy_agent/docker-compose.yml down
 ```
 
 ### 5.2 日志查看
 
 ```bash
-# 查看实时日志
+# 查看主控日志
 docker logs -f backend-api-1
 
-# 查看最近 100 行日志
-docker logs --tail 100 backend-api-1
-
-# 筛选特定任务日志
-docker logs backend-api-1 | grep "task_id"
+# 查看 Agent 日志
+docker logs -f comfy-agent
 ```
 
 ### 5.3 配置文件更新
 
-1. 修改 `/home/ubantu/backend/.env` 文件。
-2. 执行 `docker compose up -d` 重新加载配置。
-
-### 5.4 数据备份
-
-- **Redis 数据**: 默认挂载在 `redis_data` 卷。
-- **文件数据**: 定期备份 `/home/ubantu/comfyui/output` 目录。
-  ```bash
-  # 备份 Output 目录
-  tar -czf backup_output_$(date +%Y%m%d).tar.gz /home/ubantu/comfyui/output
-  ```
+1. 修改 `/home/ubantu/backend/.env` (主控) 或 `/home/ubantu/backend/comfy_agent/.env` (Agent)。
+2. 对于 Agent，可以通过 `SUPPORTED_TASK_TYPES` 环境变量（如 `img2img,face_swap`）指定其支持的任务类型。若留空则接取所有任务。
+3. 重启对应容器。
 
 ***
 
@@ -316,19 +315,18 @@ docker logs backend-api-1 | grep "task_id"
 | Key 模式                     | 类型     | TTL | 说明                                                          |
 | -------------------------- | ------ | --- | ----------------------------------------------------------- |
 | `comfy:task:{uuid}`        | Hash   | 24h | 存储任务详情 (status, params, result\_path, progress, error\_msg) |
-| `comfy:queue:pending`      | ZSet   | -   | 等待队列。Member: task\_id, Score: 优先级权重 (当前时间戳减去 priority * 60 秒) |
-| `comfy:queue:running`      | Set    | -   | 运行中任务集合。用于并发控制和故障恢复。                                        |
-| `comfy:prompt:{prompt_id}` | String | 1h  | ComfyUI Prompt ID 到 Task ID 的反向映射。                          |
+| `comfy:queue:pending`      | ZSet   | -   | 等待队列。Member: task\_id, Score: 优先级权重 |
+| `comfy:queue:running`      | Set    | -   | 运行中任务集合。用于故障恢复。 |
+| `comfy:agent:workers`      | Set    | 1m  | 活跃 Agent 注册表 (Heartbeat)。 |
 
 ### 6.2 文件存储路径规划
 
-| 路径            | 宿主机位置                 | 容器内挂载                         | 用途              |
-| ------------- | --------------------- | ----------------------------- | --------------- |
-| **Input**     | `~/comfyui/input`     | `/home/ubantu/comfyui/input`  | 用户上传的原始图片/视频    |
-| **Output**    | `~/comfyui/output`    | `/home/ubantu/comfyui/output` | ComfyUI 生成的最终结果 |
-| **Temp**      | `~/comfyui/temp`      | `/home/ubantu/comfyui/temp`   | 中间过程文件/预览图      |
-| **Workflows** | `~/backend/workflows` | `/app/workflows`              | 业务逻辑模板文件        |
-| **MinIO**     | -                     | -                             | 云端存储 (Bucket: `comfyui-temp`, `bot-data`, `bot-template`)，作为文件和结果的回退获取源 |
+| 存储类型 | 桶/目录名 | 说明 |
+| --- | --- | --- |
+| **MinIO (Input)** | `comfyui-input` | 存储用户上传的原始图片/视频。 |
+| **MinIO (Temp)** | `comfyui-temp` | 存储 Agent 生成的最终结果和中间文件。 |
+| **Local (Agent)** | `/input`, `/output` | Agent 容器内的临时缓存目录，与宿主机隔离。 |
+| **Local (Workflows)** | `~/backend/workflows` | 业务逻辑模板文件 (主控与 Agent 同步)。 |
 
 ### 6.3 数据归档策略
 

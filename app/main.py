@@ -181,6 +181,7 @@ async def create_video_edit_task(
 async def create_t2i_pornmaster_turbo_task(
     request: dict = Body(...),
     async_mode: bool = Query(True, alias="async"),
+    priority: int = Query(0),
     queue_manager: QueueManager = Depends(get_queue_manager),
     token: str = Depends(verify_token)
 ):
@@ -193,11 +194,14 @@ async def create_t2i_pornmaster_turbo_task(
         logger.error(f"[{request_id}] Invalid prompt: {prompt}")
         raise HTTPException(status_code=400, detail="prompt is required and length must be 1-512")
     
-    # 2. Enqueue task
+    # 2. Extract priority from body if present, otherwise use query param
+    task_priority = request.get("priority", priority)
+    
+    # 3. Enqueue task
     params = {"prompt": prompt}
     try:
-        task_id = await queue_manager.enqueue_task(TaskType.T2I_PORNMASTER_TURBO, params)
-        logger.info(f"[{request_id}] Task enqueued: {task_id}")
+        task_id = await queue_manager.enqueue_task(TaskType.T2I_PORNMASTER_TURBO, params, task_priority)
+        logger.info(f"[{request_id}] Task enqueued: {task_id} with priority {task_priority}")
     except Exception as e:
         logger.error(f"[{request_id}] Failed to enqueue task: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

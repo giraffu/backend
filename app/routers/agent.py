@@ -52,10 +52,15 @@ def verify_token(authorization: Optional[str] = Header(None)):
 
 @router.get("/pop")
 async def pop_task(
+    types: Optional[str] = None,
     authorized: bool = Depends(verify_token),
     queue_manager: QueueManager = Depends(get_queue_manager)
 ):
-    task_data = await queue_manager.dequeue_task()
+    allowed_types = None
+    if types:
+        allowed_types = [t.strip() for t in types.split(",")]
+        
+    task_data = await queue_manager.dequeue_task(allowed_types=allowed_types)
     if not task_data:
         raise HTTPException(status_code=404, detail="No pending tasks")
         

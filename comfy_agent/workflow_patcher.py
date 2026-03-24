@@ -38,7 +38,7 @@ class WorkflowPatcher:
             filename = "perfect_video_insert.json"
         elif task_type == "video_edit":
             filename = "perfect_video_edit.json"
-        elif task_type == "t2i_pornmaster_turbo":
+        elif task_type == "t2i-pornmaster-turbo":
             filename = "Pornmaster Z-Image Turbo_t2i_Double checkpoints & realism enhancer_V1_2026_01_24.json"
             
         path = os.path.join(self.workflows_dir, filename)
