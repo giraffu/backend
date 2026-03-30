@@ -39,6 +39,11 @@ class CompleteRequest(BaseModel):
     agent_id: str
     result: str
 
+class HeartbeatRequest(BaseModel):
+    agent_id: str
+    types: str
+    status: str = "idle" # idle or running
+
 def verify_token(authorization: Optional[str] = Header(None)):
     from app.config import settings
     # Assuming AGENT_SECRET_TOKEN is added to settings, or use placeholder
@@ -93,4 +98,13 @@ async def complete_task(
     queue_manager: QueueManager = Depends(get_queue_manager)
 ):
     await queue_manager.complete_task(req.task_id, req.result)
+    return {"status": "ok"}
+
+@router.post("/heartbeat")
+async def heartbeat(
+    req: HeartbeatRequest,
+    authorized: bool = Depends(verify_token),
+    queue_manager: QueueManager = Depends(get_queue_manager)
+):
+    await queue_manager.update_agent_heartbeat(req.agent_id, req.types, req.status)
     return {"status": "ok"}

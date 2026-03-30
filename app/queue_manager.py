@@ -12,6 +12,7 @@ class QueueManager:
         self.pending_key = "comfy:queue:pending"
         self.running_key = "comfy:queue:running"
         self.task_prefix = "comfy:task:"
+        self.agent_heartbeat_prefix = "comfy:agent:heartbeat:"
         self.ttl = 86400  # 24 hours
 
     async def enqueue_task(self, task_type: TaskType, params: Dict[str, Any], priority: int = 0) -> str:
@@ -136,9 +137,27 @@ class QueueManager:
         return await self.redis.zcard(self.pending_key)
         
     async def get_active_workers_count(self) -> int:
-        # Since we might have multiple workers in future, or just one now.
-        # This tracks running tasks, which corresponds to active workers if 1 task per worker.
-        return await self.redis.scard(self.running_key)
+        # Get count of agents that have sent a heartbeat recently
+        cursor = 0
+        count = 0
+        pattern = f"{self.agent_heartbeat_prefix}*"
+        while True:
+            cursor, keys = await self.redis.scan(cursor, match=pattern, count=100)
+            count += len(keys)
+            if cursor == 0:
+                break
+        return count
+
+    async def update_agent_heartbeat(self, agent_id: str, types: str, status: str):
+        key = f"{self.agent_heartbeat_prefix}{agent_id}"
+        data = {
+            "types": types,
+            "status": status,
+            "last_seen": time.time()
+        }
+        await self.redis.hset(key, mapping=data)
+        # Agent heartbeats every 10-15s, expire if no heartbeat for 30s
+        await self.redis.expire(key, 30)
 
     async def get_queue_metrics_by_type(self) -> Dict[str, int]:
         task_ids = await self.redis.zrange(self.pending_key, 0, -1)

@@ -372,15 +372,8 @@ async def get_system_status(
     queue_size = await queue_manager.get_queue_size()
     active_workers = await queue_manager.get_active_workers_count()
     
-    # We no longer have direct connection to local ComfyUI in the Master node
-    # Since we have decoupled the worker to an independent agent, we cannot easily know 
-    # the exact number of active workers just by looking at the running queue 
-    # (because a crashed agent leaves a task in the running queue).
-    # To prevent displaying wrong "active workers" count to the user, we will just return 1 if there is at least one agent polling,
-    # or rely on a different metric. For now, since you have 1 comfy-agent container, let's hardcode it to 1 if it's online.
-    # A proper fix would be for agents to heartbeat, but as a quick fix:
-    comfy_online = True
-    active_workers = 1 if queue_size > 0 or active_workers > 0 else 0
+    # We now use Redis heartbeats to accurately track active workers
+    comfy_online = active_workers > 0
     
     queue_by_type = await queue_manager.get_queue_metrics_by_type()
     
